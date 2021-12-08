@@ -2,20 +2,58 @@ use connect4::solver::Solver;
 use connect4::Position;
 
 use std::io;
+use std::thread::sleep;
 use std::time;
 
-const HUMAN_FIRST: bool = false;
-const DEPTH: i32 = 20;
+const HUMAN_FIRST: bool = true;
+const DEPTH: i32 = 10;
+const ITERATIVE_DEEPENING: bool = true;
 
 fn main() {
-    play(HUMAN_FIRST);
+    //human_vs_ai(HUMAN_FIRST);
+    ai_vs_ai(22, 11);
 }
 
-fn play(human_first: bool) {
+fn ai_vs_ai(d1: i32, d2: i32) {
     let mut p = Position::new(7, 6);
-    let mut board = vec![Vec::new(); p.width as usize];
+    let mut b = vec![vec!["~"; p.width as usize]; p.height as usize];
 
     let result = loop {
+        let (r, summary) = computer_turn(&mut p, &mut b, d1, "o", false);
+        println!(
+            "Computer1 played {}, searched {} nodes in {} seconds; evaluation: {}",
+            summary.0, summary.1, summary.2, summary.3,
+        );
+        print_board(&b);
+        if r {
+            break "Computer 1 Wins";
+        }
+
+        let (r, summary) = computer_turn(&mut p, &mut b, d2, "x", false);
+        println!(
+            "Computer2 played {}, searched {} nodes in {} seconds; evaluation: {}",
+            summary.0, summary.1, summary.2, summary.3,
+        );
+        print_board(&b);
+        if r {
+            break "Computer 2 Wins";
+        }
+
+        if p.moves == p.width * p.height {
+            break "Draw";
+        }
+        sleep(time::Duration::from_secs(1));
+    };
+
+    println!("{}", result);
+}
+
+fn human_vs_ai(human_first: bool) {
+    let mut p = Position::new(7, 6);
+    let mut board = vec![vec!["~"; p.width as usize]; p.height as usize];
+
+    let result = loop {
+        print_board(&board);
         if human_first {
             let r = human_turn(&mut p, &mut board);
             if r {
@@ -24,12 +62,22 @@ fn play(human_first: bool) {
 
             print_board(&board);
 
-            let r = computer_turn(&mut p, &mut board);
+            let (r, summary) = computer_turn(&mut p, &mut board, DEPTH, "x", ITERATIVE_DEEPENING);
+            println!(
+                "computer played {}, searched {} nodes in {} seconds",
+                summary.0, summary.1, summary.2,
+            );
+            println!("Computer Evaluation: {}", summary.3);
             if r {
                 break "Computer wins!";
             }
         } else {
-            let r = computer_turn(&mut p, &mut board);
+            let (r, summary) = computer_turn(&mut p, &mut board, DEPTH, "x", ITERATIVE_DEEPENING);
+            println!(
+                "computer played {}, searched {} nodes in {} seconds",
+                summary.0, summary.1, summary.2,
+            );
+            println!("Computer Evaluation: {}", summary.3);
             if r {
                 break "Computer wins!";
             }
@@ -47,35 +95,40 @@ fn play(human_first: bool) {
     println!("{}", result);
 }
 
-fn computer_turn(p: &mut Position, b: &mut Vec<Vec<i32>>) -> bool {
+fn computer_turn(
+    p: &mut Position,
+    b: &mut Vec<Vec<&'static str>>,
+    depth: i32,
+    piece: &'static str,
+    id: bool,
+) -> (bool, (i32, u128, f64, i32)) {
     let ab = (p.width * p.height) / 2;
     let start = time::Instant::now();
-    let (_, best, n_nodes) = Solver::solve(p, DEPTH, ab);
+    let (eval, best, n_nodes) = Solver::solve(p, depth, ab, id);
     let end = start.elapsed().as_secs_f64();
-    println!(
-        "computer played {}, searched {} nodes in {} seconds",
-        best + 1,
-        n_nodes,
-        end
-    );
-    b[best as usize].push(2);
+
+    let summary = (best + 1, n_nodes, end, eval);
+
+    add_to_board(b, best as usize, piece);
+
     if p.is_winning_move(best as usize) {
         p.play(best as usize);
-        return true;
+        return (true, summary);
     }
 
     p.play(best as usize);
 
-    false
+    (false, summary)
 }
 
-fn human_turn(p: &mut Position, b: &mut Vec<Vec<i32>>) -> bool {
+fn human_turn(p: &mut Position, b: &mut Vec<Vec<&'static str>>) -> bool {
     println!("enter column");
     let mut col = String::new();
     io::stdin().read_line(&mut col).unwrap();
     let col = col.strip_suffix("\n").unwrap().parse::<usize>().unwrap() - 1;
 
-    b[col].push(1);
+    add_to_board(b, col, "o");
+
     if p.is_winning_move(col) {
         p.play(col);
         return true;
@@ -86,9 +139,20 @@ fn human_turn(p: &mut Position, b: &mut Vec<Vec<i32>>) -> bool {
     false
 }
 
-fn print_board(b: &Vec<Vec<i32>>) {
-    for (i, col) in b.iter().enumerate() {
-        println!("{} {:?}", i + 1, col);
+fn print_board(b: &Vec<Vec<&'static str>>) {
+    println!("_____________________");
+    for row in b.iter() {
+        let out = row.join("  ");
+        println!("|{}|", out);
     }
-    println!()
+    println!(" 1  2  3  4  5  6  7");
+}
+
+fn add_to_board(b: &mut Vec<Vec<&'static str>>, col: usize, piece: &'static str) {
+    for row in b.iter_mut().rev() {
+        if row[col] == "~" {
+            row[col] = piece;
+            break;
+        }
+    }
 }

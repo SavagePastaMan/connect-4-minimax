@@ -22,10 +22,12 @@ impl Solver {
         }
     }
 
-    pub fn solve(p: &mut Position, depth: i32, ab: i32) -> (i32, i32, u128) {
-//        let mut s = Solver::new(p.width, p.height);
-//        let (eval, best) = s.negamax(p, -ab, ab, depth);
-//        return (eval, best, s.node_count);
+    pub fn solve(p: &mut Position, depth: i32, ab: i32, id: bool) -> (i32, i32, u128) {
+        if !id {
+            let mut s = Solver::new(p.width, p.height);
+            let (eval, best) = s.negamax(p, -ab, ab, depth);
+            return (eval, best, s.node_count);
+        }
 
         let mut min = -ab;
         let mut max = ab;
